@@ -2,12 +2,13 @@
 
 import datetime
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, g
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import create_engine
+from sqlalchemy.orm.session import Session, sessionmaker
 from marshmallow import Schema, fields, ValidationError, pre_load
 
 app = Flask(__name__)
@@ -73,6 +74,15 @@ quote_schema = QuoteSchema()
 quotes_schema = QuoteSchema(many=True, only=('id', 'content'))
 
 ##### API #####
+@app.before_request
+def before_request():
+    print('[DEBUG]before request')
+    Session = sessionmaker(bind=engine, autocommit=True)
+    g.db_session = Session()
+
+@app.teardown_request
+def teardown_request(exception):
+    print('[DEBUG]teardown requesst')
 
 @app.route('/authors')
 def get_authors():
@@ -93,7 +103,7 @@ def get_author(pk):
 
 @app.route('/quotes/', methods=['GET'])
 def get_quotes():
-    quotes = Quote.query.all()
+    quotes = g.db_session.query(Quote).all()
     result = quotes_schema.dump(quotes)
     return jsonify({"quotes": result.data})
 
@@ -134,5 +144,6 @@ def new_quote():
                     "quote": result.data})
 
 if __name__ == '__main__':
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     app.run(debug=True, port=5000)
