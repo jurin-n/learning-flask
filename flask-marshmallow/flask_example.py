@@ -3,28 +3,33 @@
 import datetime
 
 from flask import Flask, jsonify, request
-from flask.ext.sqlalchemy import SQLAlchemy
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.engine import create_engine
 from marshmallow import Schema, fields, ValidationError, pre_load
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:////tmp/quotes.db'
-db = SQLAlchemy(app)
+engine = create_engine('sqlite:////tmp/quotes.db', echo=False)
 
 ##### MODELS #####
+Base = declarative_base()
 
-class Author(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    first = db.Column(db.String(80))
-    last = db.Column(db.String(80))
+class Author(Base):
+    __tablename__ = 'author'
+    id = Column(Integer, primary_key=True)
+    first = Column(String(80))
+    last = Column(String(80))
 
-class Quote(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    content = db.Column(db.String, nullable=False)
-    author_id = db.Column(db.Integer, db.ForeignKey("author.id"))
-    author = db.relationship("Author",
-                        backref=db.backref("quotes", lazy="dynamic"))
-    posted_at = db.Column(db.DateTime)
+class Quote(Base):
+    __tablename__ = 'quote'
+    id = Column(Integer, primary_key=True)
+    content = Column(String, nullable=False)
+    author_id = Column(Integer, ForeignKey("author.id"))
+    author = relationship("Author",
+                        backref=backref("quotes", lazy="dynamic"))
+    posted_at = Column(DateTime)
 
 ##### SCHEMAS #####
 
@@ -129,5 +134,5 @@ def new_quote():
                     "quote": result.data})
 
 if __name__ == '__main__':
-    db.create_all()
+    Base.metadata.create_all(engine)
     app.run(debug=True, port=5000)
